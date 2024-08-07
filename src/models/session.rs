@@ -1,6 +1,7 @@
-use std::io::stdin;
+use std::{io::stdin, time::Duration};
 
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio::{io::AsyncWriteExt, net::{TcpListener, TcpStream}};
+use crate::{constants::consants::{BUFFER_SIZE, VERSION}, models::session};
 
 /// Module for a chat session
 
@@ -11,8 +12,10 @@ pub enum SessionRoles {
    
 }
 
+
 pub struct Session {
     pub role: SessionRoles,
+    tcp_stream: Option<TcpStream>
    // pub attempt: u8,
 }
 impl std::fmt::Display for SessionRoles
@@ -31,7 +34,7 @@ impl std::fmt::Display for SessionRoles
 }
 impl Session {
     /// Returns default
-    pub fn new() -> Session {
+    pub async fn new() -> Session {
         println!("Please choose an option:\n1) Host\n2) Client)");
 
         let mut buffer: String = String::new();
@@ -55,6 +58,7 @@ impl Session {
                     "client" => {
                         println!("IS CLIENT");
                         temp_role = SessionRoles::Client;
+
                         break;
                     }
                     _ => {
@@ -78,45 +82,63 @@ impl Session {
                 println!("{} attempts left", attempt)
             }
         };
-   Session { role: role }
+        let d: Option<TcpStream> = {
+            if role == SessionRoles::Client
+            {
+                 let mut connection = TcpStream::connect("0.0.0.0:1963").await.unwrap();
+                 Some(connection)
+            }
+            else {
+                 None
+            }
+        };
+   Session { role: role,tcp_stream:d }
     }
 
+    pub async fn send_handshake(mut self)
+    {
+        self.tcp_stream.unwrap().write_all(b"VERSION: 0.0.1\nMESSAGE: fuck you").await.unwrap();
+
+    }
  
-
-
-}
-
-pub async fn establish_session(session: Session)
-{
-    println!("Starting session as: {}",session.role)
-
-    match session.role {
-        SessionRoles::Client=>{
-            create_client().await
-        }
-        ,
-        SessionRoles::Host=>{
-            create_host().await
-        }
-
-    }
+    pub async fn create(self)
+    {
+        println!("Starting session as: {}",self.role);
     
-}
+        match self.role {
+            SessionRoles::Client=>{
+                self.create_client().await
+            }
+            ,
+            SessionRoles::Host=>{
+                create_host().await
+            }
+    
+        }
+        
+    }
 
-
-
-async fn create_client()
+    async fn create_client(self)
 {
-    let mut connection = TcpStream::connect("0.0.0.0:1963").await.unwrap();
-    connection.write_all(b"Hello there").await.unwrap();
+    println!("Sending Handshake");
+   self.send_handshake().await;
+
+    //connection.write_all(b"Hello there").await.unwrap();
   //  tokio::net::
 }
+    
+
+}
+
+
+
+
 
 
 async fn create_host()
 {
     
-    tokio::sleep(Duration::new(3, 0));
+    tokio::time::sleep(Duration::new(3, 0)).await;
 
     let address = "0.0.0.0:1963";
  let listener=   TcpListener::bind(address).await.unwrap();
@@ -124,7 +146,7 @@ async fn create_host()
       match  listener.accept().await
         {
             Ok((stream,adr))=>{
-                let mut b1 = [0;10];
+                let mut b1 = [0;BUFFER_SIZE];
                 println!("GOT CONNECTION");
                 stream.peek(&mut b1).await.unwrap();
                 println!("{:?}", b1);

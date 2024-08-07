@@ -2,7 +2,7 @@ use core::panic;
 use std::{io::{stdin, BufRead, Read}, thread, time::Duration};
 pub mod models;
 
-
+pub mod constants;
 use crate::models::session::Session;
 
 
@@ -14,9 +14,10 @@ async fn main() {
 
 
     // Create a new session
-    let mut session =  Session::new();
+    let current_session =  Session::new().await;
 
-    session::establish_session(session).await;
+
+    current_session.create().await;
     
 
 
